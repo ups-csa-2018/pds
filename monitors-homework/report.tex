@@ -1,0 +1,305 @@
+\documentclass[a4paper, 12pt]{article}
+
+\usepackage[cm]{fullpage}
+\usepackage{listings}
+\usepackage{multicol}
+\usepackage{hyperref}
+\usepackage{xcolor}
+
+\definecolor{green}{rgb}{0,0.6,0}
+\definecolor{gray}{rgb}{0.5,0.5,0.5}
+\lstset{
+    language=C,
+    columns=flexible,
+    frame=single,
+    xleftmargin=\parindent,
+    showstringspaces=false,
+    columns=flexible,
+    basicstyle={\footnotesize\ttfamily},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    keywordstyle=\color{blue},
+    commentstyle=\color{green},
+    breaklines=true,
+    breakatwhitespace=true,
+}
+
+\title{Exercise 1 on Hoare Monitors
+    \\ \large Parallel and Distributed Systems - Master CSA}
+\author{Jules Lamur}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+    This is the first exercise of the exercise sheet that was given as a
+    homework:
+    \url{https://moodle.univ-tlse3.fr/pluginfile.php/227123/mod_resource/content/3/Monitors.pdf}
+\end{abstract}
+
+\section{Introduction}
+
+For the sake of clarity, we consider that the object type \textbf{ring\_buffer}
+exists and offers the following methods on its instances:
+
+\begin{itemize}
+    \item \textbf{void push(message\_t message)}: enqueues a \textbf{message} in
+        the ring buffer ;
+    \item \textbf{message\_t pop()}: dequeues a message and returns it ;
+    \item \textbf{message\_t front()}: returns the first message to be dequeued
+        but do not dequeues it ;
+    \item \textbf{bool is\_full()}: true if the ring buffer is full, false
+        otherwise ;
+    \item \textbf{bool is\_empty()}: true if the ring buffer is empty, false
+        otherwise.
+    \item \textbf{unsigned int count()}: returns the number of elements
+        currently stored inside the buffer.
+\end{itemize}
+
+These methods are, of course, \textbf{not thread safe}.
+An object of type \textbf{ring\_buffer} is initialized with one parameter, its
+size, which is an unsigned integer.
+
+The \textbf{message\_t} type is defined later in every exercise and we suppose
+that its copy constructor is sufficient to copy any instance of it.
+
+\pagebreak
+
+\section{Exercise}
+\subsection{Version 1}
+
+\subsubsection{Blocking / unblocking conditions}
+\begin{itemize}
+    \item \textbf{a producer is blocked} when the buffer is full ;
+    \item \textbf{a producer is unblocked} when a consumer extracts a message from the
+        buffer (the buffer is no longer full) ;
+    \item \textbf{a consumer is blocked} when the buffer is empty ;
+    \item \textbf{a consumer is unblocked} when a producer inserts a message in the
+        buffer (the buffer is no longer empty).
+\end{itemize}
+
+\subsubsection{State variables}
+\begin{itemize}
+    \item \textbf{ring\_buffer buffer}: buffer ring containing messages waiting to be
+        consumed.
+\end{itemize}
+
+\subsubsection{Condition variables}
+\begin{itemize}
+    \item \textbf{message\_available}: signaled when the buffer contains at
+        least one message ;
+    \item \textbf{slot\_available}: signaled when the buffer is not full.
+\end{itemize}
+
+\subsubsection{Full code}
+\begin{lstlisting}
+typedef ... message_t;
+unsigned int buf_size = ...;
+
+monitor producer_consumer {
+    ring_buffer buffer(buf_size);
+    condition_var message_available;
+    condition_var slot_available;
+
+    void insert(message_t message) {
+        if (buffer.is_full()) {
+            slot_available.wait();
+        }
+
+        buffer.push(message);
+        message_available.signal();
+    }
+
+    message_t extract() {
+        if (buffer.is_empty()) {
+            message_available.wait();
+        }
+
+        message_t message = buffer.pop();
+        slot_available.signal();
+
+        return message;
+    }
+}
+\end{lstlisting}
+
+\pagebreak
+
+\subsection{Version 2}
+
+\subsubsection{Blocking / unblocking conditions}
+\begin{itemize}
+    \item \textbf{a producer is blocked} when the buffer is full or when the
+        type of the previously inserted message is the same as its own.
+    \item \textbf{a producer is unblocked}:
+        \begin{itemize}
+            \item when a consumer extracts a message from the buffer (the
+                buffer is no longer full) and the previously inserted message
+                is of a different type ;
+            \item or when a producer of a different type inserts a message and
+                the buffer is not full ;
+        \end{itemize}
+    \item \textbf{a consumer is blocked} when the buffer is empty ;
+    \item \textbf{a consumer is unblocked} when a producer inserts a message in the
+        buffer (the buffer is no longer empty).
+\end{itemize}
+
+\subsubsection{State variables}
+\begin{itemize}
+    \item \textbf{ring\_buffer buffer}: buffer ring containing messages waiting to be
+        consumed ;
+    \item \textbf{bool last\_inserted\_type}: the type of last inserted
+        message.
+\end{itemize}
+
+\subsubsection{Condition variables}
+\begin{itemize}
+    \item \textbf{message\_available}: signaled when the buffer contains at
+        least one message ;
+    \item \textbf{type\_one\_producer\_turn}: signaled when the producer of type
+        one can insert a message ;
+    \item \textbf{type\_two\_producer\_turn}: signaled when the producer of type
+        two can insert a message.
+\end{itemize}
+
+\pagebreak
+
+\subsubsection{Full code}
+\begin{lstlisting}
+typedef struct {
+    ...
+    bool type;
+} message_t;
+unsigned int buf_size = ...;
+
+monitor producer_consumer {
+    ring_buffer buffer(buf_size);
+    bool last_inserted_type = true;
+    condition_var message_available;
+    condition_var type_one_producer_turn;
+    condition_var type_two_producer_turn;
+
+    // this method is not a protected one (it can be called within
+    // another monitor's method without creating a deadlock).
+    void signal_producer(bool type) {
+        if (type == true) {
+            type_two_producer_turn.signal();
+        } else {
+            type_one_producer_turn.signal();
+        }
+    }
+
+    void insert(message_t message) {
+        if (buffer.is_full() || last_inserted_type == message.type) {
+            // we consider that type == true is the producer type one.
+            if (message.type == true) {
+                type_one_producer_turn.wait();
+            } else {
+                type_two_producer_turn.wait();
+            }
+        }
+
+        buffer.push(message);
+        last_inserted_type = message.type;
+
+        if (!buffer.is_full()) {
+            signal_producer(message_type);
+        }
+
+        message_available.signal();
+    }
+
+    message_t extract() {
+        if (buffer.is_empty()) {
+            message_available.wait();
+        }
+
+        message_t message = buffer.pop();
+        signal_producer(last_inserted_type);
+
+        return message;
+    }
+}
+\end{lstlisting}
+
+\pagebreak
+
+\subsection{Version 3}
+
+\subsubsection{Blocking / unblocking conditions}
+\begin{itemize}
+    \item \textbf{a producer is blocked} when the buffer is full ;
+    \item \textbf{a producer is unblocked} when a consumer extracts a message
+        from the buffer (the buffer is no longer full) ;
+    \item \textbf{a consumer is blocked} when the next message has a different
+        type than its own or the buffer is empty ;
+    \item \textbf{a consumer is unblocked}:
+        \begin{itemize}
+            \item when a consumer extracts a message and the next message has
+                the same type as this consumer ;
+            \item or when a producer inserts a message of the type of this
+                consumer and the buffer was previously empty.
+        \end{itemize}
+\end{itemize}
+
+\subsubsection{State variables}
+\begin{itemize}
+    \item \textbf{ring\_buffer buffer}: buffer ring containing messages waiting
+        to be consumed.
+\end{itemize}
+
+\subsubsection{Condition variables}
+\begin{itemize}
+    \item \textbf{message\_available[nb\_types]}: signaled when the buffer
+        contains at least one message for the given type ;
+    \item \textbf{slot\_available}: signaled when the buffer is not full.
+\end{itemize}
+
+\pagebreak
+
+\subsubsection{Full code}
+\begin{lstlisting}
+typedef unsigned int type_t;
+typedef struct {
+    ...
+    type_t type;
+} message_t;
+unsigned int buf_size = ...;
+unsigned int nb_types = ...;
+
+monitor producer_consumer {
+    ring_buffer buffer(buf_size);
+    condition_var message_available[nb_types];
+    condition_var slot_available;
+
+    void insert(message_t message) {
+        if (buffer.is_full()) {
+            slot_available.wait();
+        }
+
+        buffer.push(message);
+
+        if (buffer.size() == 1) {
+            message_available[message.type].signal();
+        }
+    }
+
+    message_t extract(type_t type) {
+        if (buffer.is_empty() || buffer.front().type != type) {
+            message_available[type].wait();
+        }
+
+        message_t message = buffer.pop();
+        slot_available.signal();
+
+        if (!buffer.is_empty()) {
+            message_available[buffer.front().type].signal();
+        }
+
+        return message;
+    }
+}
+\end{lstlisting}
+
+\end{document}
