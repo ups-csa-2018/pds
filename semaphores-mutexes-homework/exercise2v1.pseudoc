@@ -1,0 +1,24 @@
+typedef ... message_t;
+
+rbuf_t buf(N);
+semaphore slots_available(N);
+semaphore messages_available(0);
+semaphore buf_mtx(1);
+
+message_t consumer() {
+    wait(messages_available);
+    wait(buf_mtx);
+    message_t msg = rbuf_pop(buf);
+    post(buf_mtx);
+    post(slots_available);
+
+    return msg;
+}
+
+void producer(message_t msg) {
+    wait(slots_available);
+    wait(buf_mtx);
+    rbuf_push(buf, msg);
+    post(buf_mtx);
+    post(messages_available);
+}

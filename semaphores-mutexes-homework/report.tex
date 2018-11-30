@@ -1,0 +1,106 @@
+\documentclass[a4paper, 12pt]{article}
+
+\usepackage[cm]{fullpage}
+\usepackage[utf8]{inputenc}
+\usepackage{color}
+\usepackage{hyperref}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{multicol}
+
+\definecolor{dkgreen}{rgb}{0,0.6,0}
+\definecolor{gray}{rgb}{0.5,0.5,0.5}
+\definecolor{mauve}{rgb}{0.58,0,0.82}
+
+\lstset{frame=tb,
+    language=C,
+    frame=single,
+    xleftmargin=\parindent,
+    showstringspaces=false,
+    columns=flexible,
+    basicstyle={\footnotesize\ttfamily},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    keywordstyle=\color{blue},
+    commentstyle=\color{dkgreen},
+    stringstyle=\color{mauve},
+    breaklines=true,
+    breakatwhitespace=true,
+}
+
+\title{Report of Semaphore Practical Session
+    \\ \large Parallel and Distributed Systems - Master CSA}
+\author{Jules Lamur}
+
+\begin{document}
+
+\maketitle
+
+\newpage
+
+\section{Pseudo code algorithms}
+\subsection{Version 1}
+    \begin{multicols}{2}
+        \lstinputlisting{exercise2v1.pseudoc}
+    \end{multicols}
+\subsection{Version 2}
+    \begin{multicols}{2}
+        \lstinputlisting{exercise2v2.pseudoc}
+    \end{multicols}
+\subsection{Version 3}
+    \begin{multicols}{2}
+        \lstinputlisting{exercise2v3.pseudoc}
+    \end{multicols}
+
+\newpage
+
+\section{Full code}
+\subsection{Version 1}
+    \lstinputlisting{exercise2v1.c}
+    \newpage
+\subsection{Version 2}
+    \lstinputlisting{exercise2v2.c}
+    \newpage
+\subsection{Version 3}
+    \lstinputlisting{exercise2v3.c}
+
+\newpage
+
+\section{Comments}
+\subsection{From the student}
+
+I already knew how to use threads and mutexes, but I did not know semaphores
+exist before this course.
+
+Since the buffer and common thread logic are not the purpose of the exercises,
+they are decoupled from the source code that I included in this report (my
+implementations are available respectively on the
+\href{https://github.com/ups-csa-2018/pds/tree/master/semaphores-mutexes-homework/rbuf.h}{rbuf.h}
+and
+\href{https://github.com/ups-csa-2018/pds/tree/master/semaphores-mutexes-homework/common.c}{common.c}
+files).
+
+I had no particular problem except with the length restriction: that's one of
+the worst programming experience I've ever had, because of that.
+
+Because of this limit, there are a lot of `mistakes', unhandled edge
+cases, and I was forced to export the code of the buffer and the common thread
+logic to other files.
+
+99\% of the time I used on these exercises was spent modifying the application
+design to the make the algortihms fit into one page. Among other things, I gave up on
+exiting the consumers threads correctly (hence
+\href{https://github.com/ups-csa-2018/pds/blob/master/semaphores-mutexes-homework/common.c#L117-L119}{this
+comment in `common.c' at line 117}).
+
+I am exhausted by this homework and also frustrated to be forced to focus on
+giving a short code instead of a good one.
+
+The source codes were compiled and tested on the latest versions of Linux with
+the GNU C Library and GNU Compiler Collection; the build environment and the
+latex code of this pdf are available here:
+\url{https://github.com/ups-csa-2018/pds/tree/master/semaphores-mutexes-homework/}.
+
+\subsection{From the professor}
+
+\enddocument

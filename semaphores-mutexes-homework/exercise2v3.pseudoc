@@ -1,0 +1,28 @@
+typedef struct { int type; ... } message_t;
+
+rbuf_t buf(N);
+semaphore slots_available(N);
+semaphore messages_available(0);
+semaphore buf_mtx(1);
+semaphore types_mtx[nb_types] = {0, ..., 0};
+
+message_t consumer(int type) {
+    wait(type_mtx[type]);
+    wait(buf_mtx);
+    message_t msg = rbuf_pop(buf);
+    if (!rbuf_is_empty(buf))
+        post(types_mtx[rbuf_front(buf).type]);
+    post(buf_mtx);
+    post(slots_available);
+
+    return msg;
+}
+
+void producer(message_t msg) {
+    wait(slots_available);
+    wait(buf_mtx);
+    rbuf_push(buf, msg);
+    if (rbuf_count(buf) == 1)
+        post(types_mtx[msg.type]);
+    post(buf_mtx);
+}
